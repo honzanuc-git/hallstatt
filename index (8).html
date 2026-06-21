@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hallstatt - víkendový itinerář</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --cream:#F5F1E8;
+    --white:#FFFFFF;
+    --ink:#16302E;
+    --teal:#2E6F72;
+    --mustard:#E8A33D;
+    --rust:#C1492F;
+    --slate:#6B7572;
+    --line:#E1D9C6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:0 18px 60px;}
+
+  /* HEADER */
+  header{
+    padding:28px 18px 18px;
+    max-width:640px;
+    margin:0 auto;
+  }
+  .eyebrow{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    font-size:12px;
+    color:var(--teal);
+  }
+  h1{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.01em;
+    font-size:34px;
+    margin:6px 0 4px;
+    line-height:1.05;
+  }
+  .subtitle{color:var(--slate);font-size:15px;margin:0;}
+
+  /* TRIP INFO CARD */
+  .trip-info{
+    background:var(--ink);
+    color:var(--cream);
+    border-radius:6px;
+    padding:18px 20px;
+    margin:18px 0 22px;
+  }
+  .trip-info .row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:9px 0;
+    border-bottom:1px solid rgba(245,241,232,.15);
+    font-size:14.5px;
+    align-items:baseline;
+    flex-wrap:wrap;
+  }
+  .trip-info .row:last-child{border-bottom:none;}
+  .trip-info .label{color:rgba(245,241,232,.65);font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;font-family:'Oswald',sans-serif;}
+  .trip-info .val{font-weight:500;text-align:right;}
+  .trip-info a{color:var(--mustard);text-decoration:none;font-weight:600;}
+  .trip-info a:hover{text-decoration:underline;}
+
+  /* WARNING BANNER */
+  .banner{
+    background:#FBE9DE;
+    border-left:4px solid var(--rust);
+    padding:13px 16px;
+    border-radius:4px;
+    font-size:14px;
+    margin-bottom:24px;
+    line-height:1.5;
+  }
+  .banner b{color:var(--rust);}
+  .banner a{color:var(--rust);font-weight:600;text-decoration:underline;}
+
+  /* TABS (pure CSS, 3-way) */
+  .tabs{position:relative;}
+  .tabs input{position:absolute;opacity:0;pointer-events:none;}
+  .tab-bar{
+    display:flex;
+    gap:8px;
+    margin-bottom:20px;
+    position:sticky;
+    top:0;
+    background:var(--cream);
+    padding:10px 0;
+    z-index:10;
+  }
+  .tab-bar label{
+    flex:1;
+    text-align:center;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-size:13px;
+    padding:11px 4px;
+    border:1.5px solid var(--ink);
+    border-radius:4px;
+    cursor:pointer;
+    color:var(--ink);
+    background:var(--white);
+    transition:background .15s ease, color .15s ease;
+  }
+  #tab-sat:checked ~ .tab-bar label[for="tab-sat"],
+  #tab-sun:checked ~ .tab-bar label[for="tab-sun"],
+  #tab-food:checked ~ .tab-bar label[for="tab-food"]{
+    background:var(--ink);
+    color:var(--cream);
+  }
+  .day-content{display:none;}
+  #tab-sat:checked ~ #content-sat{display:block;}
+  #tab-sun:checked ~ #content-sun{display:block;}
+  #tab-food:checked ~ #content-food{display:block;}
+
+  .day-heading{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    color:var(--teal);
+    margin:26px 0 12px;
+  }
+  .day-heading:first-child{margin-top:0;}
+
+  /* MAP */
+  .map-box{
+    height:260px;
+    border-radius:6px;
+    overflow:hidden;
+    border:1px solid var(--line);
+    margin-bottom:18px;
+    background:var(--line);
+  }
+  .leaflet-popup-content{font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:1.5;}
+  .leaflet-popup-content b{font-family:'Oswald',sans-serif;}
+  .leaflet-popup-content a{color:var(--teal);font-weight:600;}
+
+  /* TIMELINE / STOPS */
+  .timeline{border-left:2px solid var(--line);padding-left:0;margin-left:6px;}
+  .stop{
+    background:var(--white);
+    border-radius:4px;
+    padding:16px 16px 16px 18px;
+    margin:0 0 14px -2px;
+    border:1px solid var(--line);
+    border-left:2px solid var(--line);
+    position:relative;
+  }
+  .stop.food{border-left:2px solid var(--mustard);padding:0 0 16px;overflow:hidden;}
+  .stop.food .stop-body{padding:0 16px 0 18px;}
+  .stop img.dish-photo{
+    width:100%;
+    height:170px;
+    object-fit:cover;
+    display:block;
+  }
+  .stop-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+    flex-wrap:wrap;
+  }
+  .stop.food .stop-head{padding:14px 16px 0 18px;margin-bottom:8px;}
+  .time-tag{
+    background:var(--mustard);
+    color:var(--ink);
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    padding:5px 16px 5px 10px;
+    clip-path:polygon(0 0, 88% 0, 100% 50%, 88% 100%, 0 100%);
+    white-space:nowrap;
+  }
+  .time-tag.food-tag{background:var(--teal);color:var(--white);}
+  .mode{
+    font-size:12.5px;
+    color:var(--slate);
+    font-weight:500;
+  }
+  .stop h3{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:18px;
+    margin:0 0 6px;
+    text-transform:none;
+  }
+  .stop p{
+    margin:0 0 12px;
+    font-size:14.5px;
+    color:#374241;
+    line-height:1.5;
+  }
+  .stop p.note{
+    color:var(--teal);
+    font-size:13px;
+    font-style:italic;
+  }
+  .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .stop.food .actions{padding:0 16px 0 18px;}
+  .btn{
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    text-decoration:none;
+    padding:8px 14px;
+    border-radius:4px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .btn-primary{background:var(--teal);color:var(--white);}
+  .btn-primary:hover{background:var(--ink);}
+  .btn-outline{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
+  .btn-outline:hover{background:var(--teal);color:var(--white);}
+  .stop.optional{opacity:.85;border-style:dashed;}
+
+  /* VARIANT TOGGLE */
+  .variant-toggle input{position:absolute;opacity:0;pointer-events:none;}
+  .variant-bar{display:flex;gap:8px;margin:6px 0 14px;}
+  .variant-bar label{
+    flex:1;
+    text-align:center;
+    font-size:13.5px;
+    font-weight:600;
+    padding:10px 6px;
+    border:1.5px solid var(--teal);
+    border-radius:4px;
+    cursor:pointer;
+    color:var(--teal);
+    background:var(--white);
+  }
+  #var-a:checked ~ .variant-bar label[for="var-a"],
+  #var-b:checked ~ .variant-bar label[for="var-b"]{
+    background:var(--teal);
+    color:var(--white);
+  }
+  .variant-card{display:none;}
+  #var-a:checked ~ #card-a{display:block;}
+  #var-b:checked ~ #card-b{display:block;}
+
+  /* FOOD TAB - photo grid cards */
+  .food-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px;}
+  @media (max-width:480px){.food-grid{grid-template-columns:1fr;}}
+  .food-card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .food-card img{width:100%;height:130px;object-fit:cover;display:block;}
+  .food-card .body{padding:12px 14px;}
+  .food-card h4{
+    font-family:'Oswald',sans-serif;
+    font-size:15.5px;
+    margin:0 0 5px;
+    font-weight:600;
+  }
+  .food-card p{font-size:13px;color:#374241;margin:0 0 10px;line-height:1.45;}
+  .food-card .actions{gap:6px;}
+  .food-card .btn{font-size:12.5px;padding:6px 10px;}
+  .tip-badge{
+    display:inline-block;
+    font-family:'Oswald',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--white);
+    background:var(--rust);
+    padding:3px 9px;
+    border-radius:3px;
+    margin-bottom:8px;
+  }
+  .source-note{font-size:12px;color:var(--slate);margin-top:6px;font-style:italic;}
+
+  footer{
+    text-align:center;
+    color:var(--slate);
+    font-size:12.5px;
+    padding:30px 18px 10px;
+    line-height:1.6;
+  }
+  footer a{color:var(--teal);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Brno - Hallstatt</div>
+  <h1>Víkend v Hallstattu</h1>
+  <p class="subtitle">Sobota - neděle · odjezd z Brna 6-7:00 · odjezd z Hallstattu v neděli 15:00</p>
+</header>
+
+<div class="wrap">
+
+  <div class="trip-info">
+    <div class="row">
+      <span class="label">Ubytování</span>
+      <span class="val"><a href="https://maps.google.com/?cid=1504682215292579469&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">Dr. F.-Morton-Weg 20 →</a></span>
+    </div>
+    <div class="row">
+      <span class="label">Parkování</span>
+      <span class="val"><a href="https://maps.google.com/?cid=4052720346332039370&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">P2 · ~500 m od domu →</a></span>
+    </div>
+    <div class="row">
+      <span class="label">Jízda</span>
+      <span class="val">~300 km · 3,5-4 h (přes Linz)</span>
+    </div>
+    <div class="row">
+      <span class="label">Dálniční známka</span>
+      <span class="val">10denní ~12,80 € (<a href="https://www.asfinag.at/en/toll/vignette/" target="_blank" rel="noopener">shop.asfinag.at</a>)</span>
+    </div>
+  </div>
+
+  <div class="banner">
+    <b>Pozor:</b> solný důl, lanovka Salzbergbahn i Skywalk jsou kvůli rekonstrukci zavřené (plánované znovuotevření léto 2026, ale termíny se posouvají). Ověřte aktuální stav před odjezdem na
+    <a href="https://www.salzwelten.at/de/hallstatt" target="_blank" rel="noopener">salzwelten.at</a>.
+  </div>
+
+  <div class="tabs">
+    <input type="radio" name="tabs" id="tab-sat" checked>
+    <input type="radio" name="tabs" id="tab-sun">
+    <input type="radio" name="tabs" id="tab-food">
+
+    <div class="tab-bar">
+      <label for="tab-sat">Sobota</label>
+      <label for="tab-sun">Neděle</label>
+      <label for="tab-food">🍽️ Jídlo</label>
+    </div>
+
+    <!-- SOBOTA -->
+    <section id="content-sat" class="day-content">
+
+      <div id="map-sat" class="map-box"></div>
+
+      <div class="timeline">
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">10:45</span><span class="mode">🚗 auto</span></div>
+          <h3>Parkování P2</h3>
+          <p>Auto sem zaparkujte a nechte stát celý den, centrum je pro auta uzavřené. S batohy bez problému, žádný drop-off potřeba. Sazby: 1 h 5 €, 2 h 9 €, denní lístek (13-24 h) 18 €. Vaše parkování přes noc bude pravděpodobně přes 24 h, takže reálně vyjde na cca 25-30 € za celý víkend (denní lístek + pár hodin v neděli navíc).</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=4052720346332039370&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            <a class="btn btn-outline" href="http://www.hallstatt.net/parken-in-hallstatt/" target="_blank" rel="noopener">🌐 Info o parkování</a>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">11:00</span><span class="mode">🚶 5 min</span></div>
+          <h3>Ubytování - vyhodit batohy</h3>
+          <p>Dr. F.-Morton-Weg 20. Odsud je celé centrum pěšky do 10 minut.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=1504682215292579469&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">11:15</span><span class="mode">🚶 pěšky</span></div>
+          <h3>Marktplatz</h3>
+          <p>Hlavní náměstí, kavárny, start prohlídky centra.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=16530980495413342635&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">11:45</span><span class="mode">🚶 pěšky</span></div>
+          <h3>Kostnice (Beinhaus)</h3>
+          <p>Malované lebky vedle katolického kostela. Vstup ~2 €, pouze hotově.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=15497066320737463556&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <p class="source-note">🍽️ Oběd, svačina i večeře jsou v záložce Jídlo, vč. fotek a času.</p>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">14:00</span><span class="mode">🚶 pěšky</span></div>
+          <h3>Welterbemuseum</h3>
+          <p>Keltská historie těžby soli, dobrá náhrada za zavřený solný důl. Vstup ~12 €.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=6174158825528039554&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            <a class="btn btn-outline" href="https://www.museum-hallstatt.at/" target="_blank" rel="noopener">🌐 Web</a>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">16:00</span><span class="mode">⛴️ loď</span></div>
+          <h3>Vyhlídková plavba</h3>
+          <p>Pohled na městečko z vody, okružní plavba Hallstatt - Obertraun - Hallstatt cca 50 minut. Cena ~18 €/osoba (děti 4-13 let ~12 €).</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=12671259917680950511&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            <a class="btn btn-outline" href="http://www.hallstattschifffahrt.at/" target="_blank" rel="noopener">🌐 Web</a>
+          </div>
+        </div>
+
+        <div class="stop optional">
+          <div class="stop-head"><span class="time-tag">17:45</span><span class="mode">🚶 volitelné</span></div>
+          <h3>Echernské údolí / vodopad Waldbachstrub</h3>
+          <p>Pokud zbyde čas a chuť na pohyb, lehká procházka přímo z centra, asi 30-40 min nahoru.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=9591628001572423361&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">20:30</span><span class="mode">🚶 2 min</span></div>
+          <h3>Fotopoint (večer)</h3>
+          <p>Jen pár desítek metrů od ubytování. Nejhezčí světlo na fotky je teď.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=3154636299310588243&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- NEDĚLE -->
+    <section id="content-sun" class="day-content">
+
+      <div id="map-sun" class="map-box"></div>
+
+      <div class="timeline">
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">07:30</span><span class="mode">🚶 8 min</span></div>
+          <h3>Ikonická vyhlídka</h3>
+          <p>Ta klasická pohlednicová fotka Hallstattu. Vyrazte brzy, po 9. už jsou davy turistických skupin.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=15999042382827244637&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <p class="source-note">☕ Snídaně viz záložka Jídlo, většina podniků otevírá až v 10:00.</p>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">09:00</span><span class="mode">🚗 auto</span></div>
+          <h3>Vyzvednutí auta</h3>
+          <p>Auto z P2 a vyrážíte na dopolední výlet.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=4052720346332039370&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="variant-toggle">
+          <input type="radio" name="variant" id="var-a" checked>
+          <input type="radio" name="variant" id="var-b">
+
+          <div class="variant-bar">
+            <label for="var-a">🥾 Aktivní · Five Fingers</label>
+            <label for="var-b">🌿 Klidná · Gosausee</label>
+          </div>
+
+          <div id="card-a" class="variant-card">
+            <div class="stop">
+              <div class="stop-head"><span class="time-tag">09:15</span><span class="mode">🚗 + 🚡</span></div>
+              <h3>Five Fingers (Dachstein)</h3>
+              <p>~15 min autem do Obertraun, pak lanovka a ~30 min chůze k vyhlídce. S cestou tam i zpět počítejte 3 hodiny, na 15:00 je to natěsno, hlavně při frontě na lanovku. Lanovka (Panorama-Ticket nahoru/dolů) ~48 €/osoba.</p>
+              <p class="note">Auto je tu jednodušší než kombinace vlak+loď, ta existuje, ale je výrazně pomalejší.</p>
+              <div class="actions">
+                <a class="btn btn-primary" href="https://maps.google.com/?cid=16026479998856745283&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+                <a class="btn btn-outline" href="https://dachstein-salzkammergut.com/" target="_blank" rel="noopener">🎫 Vstupenky</a>
+              </div>
+            </div>
+            <p class="source-note">🍽️ Oběd nablízku - Seecafé Obertraun, viz záložka Jídlo.</p>
+          </div>
+
+          <div id="card-b" class="variant-card">
+            <div class="stop">
+              <div class="stop-head"><span class="time-tag">09:15</span><span class="mode">🚗 auto</span></div>
+              <h3>Gosausee</h3>
+              <p>~20 min autem. Klidná procházka kolem jezera s výhledem na Dachstein, bez lanovky a bez čekání.</p>
+              <div class="actions">
+                <a class="btn btn-primary" href="https://maps.google.com/?cid=10876582086726110688&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+              </div>
+            </div>
+            <p class="source-note">🍽️ Oběd přímo u jezera - Gasthof Gosausee, viz záložka Jídlo.</p>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">13:30</span><span class="mode">🚗 + 🚶</span></div>
+          <h3>Návrat k ubytování</h3>
+          <p>Auto zpět na P2, sbalit batohy, poslední káva.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=1504682215292579469&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="stop">
+          <div class="stop-head"><span class="time-tag">15:00</span><span class="mode">🚗 odjezd</span></div>
+          <h3>Cesta zpět do Brna</h3>
+          <p>~3,5-4 hodiny zpátky přes Linz.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- JÍDLO -->
+    <section id="content-food" class="day-content">
+
+      <div id="map-food" class="map-box"></div>
+
+      <div class="day-heading">Sobota</div>
+      <div class="timeline">
+
+        <div class="stop food">
+          <img class="dish-photo" src="https://lh3.googleusercontent.com/place-photos/AJRVUZOFJDZ6-QTByMJNtgkSdR_0Uz9SrP3ANlTx-mhsLLw9AlXI-h3faGnh7E5FNBzhz_mFa0J54aoTxbxfvFtb8rTsNyDm2czjYyWiwpne57IvXGElNG_7KYoCIWby61yliaAknaPw4SzznyIsNA=s4800-w800-h600" alt="Zum Bader Gastwirtschaft" loading="lazy">
+          <div class="stop-head"><span class="time-tag food-tag">So 12:15</span><span class="mode">🍽️ oběd</span></div>
+          <div class="stop-body">
+            <h3>Zum Bader Gastwirtschaft</h3>
+            <p>Malá, autentická hospůdka kousek od náměstí, vysoké hodnocení (4,4★), domácí kuchyně, milá obsluha. Otevřeno do 17:00, zavřeno St/Čt. Hlavní jídla cca 20-24 €.</p>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=8451986518570336850&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="stop food">
+          <img class="dish-photo" src="https://lh3.googleusercontent.com/place-photos/AJRVUZP75AuRRkSlnDqihS6me60-8JHjb1Hsfe_ZVFv_z5tiexPOZ_Xg2YVukue5ZcTIhHuoKrruQXvwrg639meGJDs4Cj3lzf5ck3Cyu2j7ImAedxjk2yXTqnAGIWJEbswwEe80Wty-qruFYUDYB70=s4800-w800-h600" alt="Rührwerk schaumrollen" loading="lazy">
+          <div class="stop-head"><span class="time-tag food-tag">So 17:15</span><span class="mode">☕ svačina</span></div>
+          <div class="stop-body">
+            <h3>Rührwerk - Ofenfrische Schaumrollen</h3>
+            <p>Malá pekárna, čerstvé teplé schaumrolky rovnou z trouby. Opakovaně chválené na food blozích jako jedna z mála skutečně dobrých věcí k jídlu v Hallstattu. Schaumrolka cca 3 €, kafe cca 4-5 €.</p>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=6921226713928956647&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            <a class="btn btn-outline" href="http://www.ruehrwerk.at/" target="_blank" rel="noopener">🌐 Web</a>
+          </div>
+        </div>
+
+        <div class="stop food">
+          <img class="dish-photo" src="https://lh3.googleusercontent.com/place-photos/AJRVUZPiunK_EP4ZsXIrTvq6-VhH3Wn_rCptNYAjCfCipJhVpNwjbwunaaf1YjZjNdCfVO2cutfVdU1iUCwb93Yzkz9PUIPRA4ka9ePOfIJzWenJEExtQchVjp9PTp42ii8MhPWRuG2s46NV1kZDiJU=s4800-w800-h600" alt="Bräugasthof am Hallstattersee" loading="lazy">
+          <div class="stop-head"><span class="time-tag food-tag">So 19:00</span><span class="mode">🍽️ večeře</span></div>
+          <div class="stop-body">
+            <h3>Bräugasthof am Hallstattersee</h3>
+            <p>Pár kroků od ubytování, otevřeno do 21:00. Klasika - pstruh, schnitzel, výhled na jezero. Spolehlivá volba bez nutnosti rezervace. Hlavní jídla cca 15-20 €.</p>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=10838280871846427130&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            <a class="btn btn-outline" href="http://www.brauhaus-lobisser.com/" target="_blank" rel="noopener">🌐 Web</a>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="day-heading">Neděle</div>
+      <div class="timeline">
+
+        <div class="stop food">
+          <img class="dish-photo" src="https://lh3.googleusercontent.com/place-photos/AJRVUZPaapG97UHZ_hPjHL0o8yFZco2DUH4EUcq984ilFSm7G8zj7e6thmoXfBCOqaUOU9MEx8ohf3EHfXcpYADorTx9EKA6c1Ay3T64JbSueApKfpcfOmGQubTHTbVqDly5PvZUn2nKACOuQcNObJY=s4800-w800-h600" alt="Seecafé Obertraun" loading="lazy">
+          <div class="stop-head"><span class="time-tag food-tag">Ne 12:00 · varianta A</span><span class="mode">🍽️ oběd</span></div>
+          <div class="stop-body">
+            <h3>Seecafé Obertraun</h3>
+            <p>Kousek od lanovky Five Fingers, poloha přímo u jezera, jednoduché obědové menu. Pohodlná zastávka před cestou zpátky. Podle recenzí cca 20-25 €/osoba za jídlo.</p>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=5355535917644338578&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+          </div>
+        </div>
+
+        <div class="stop food">
+          <img class="dish-photo" src="https://lh3.googleusercontent.com/place-photos/AJRVUZMdJ8J44k6u3QgwcvabVdM9ykgvNIlgojKR0vxm-Cku_KlJangE5A2nEGZe6LYYemXnvFtJlS4XuZNOpRlGoc9rRti6rGpBxq6ODvyHOrn0_TC09RpVr1fjkdnWQyXNTil5lz5apA67Sc6PyQ=s4800-w800-h600" alt="Gasthof Gosausee" loading="lazy">
+          <div class="stop-head"><span class="time-tag food-tag">Ne 11:30 · varianta B</span><span class="mode">🍽️ oběd</span></div>
+          <div class="stop-body">
+            <h3>Gasthof Gosausee</h3>
+            <p>Přímo u jezera, velmi dobře hodnocený (4,3★, 1600+ recenzí). Gulášovka, knedlíky, podle recenzí nevynechejte Kaiserschmarrn na dezert. Hlavní jídla cca 15-20 €.</p>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://maps.google.com/?cid=10557133409220235505&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            <a class="btn btn-outline" href="http://www.gasthof-gosausee.at/" target="_blank" rel="noopener">🌐 Web</a>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="day-heading">Tipy navíc, pokud zbyde čas nebo chuť na změnu</div>
+      <div class="food-grid">
+
+        <div class="food-card">
+          <img src="https://lh3.googleusercontent.com/place-photos/AJRVUZPJYWjVUQ0jtaN3GhoM1ONjK-g-oqz509bExlLul-0S7pdf8L6nZH-Qd2j-g9boqhhhNleyXmiesKte6S57rT5_MN6zpEqtc623RvdMxzMzcCO2OY9mgVWWtcQIKPrl9U4zngK9LuPcd4RRwgHJZ6j9=s4800-w800-h600" alt="Restaurant am See" loading="lazy">
+          <div class="body">
+            <span class="tip-badge">Romantická večeře</span>
+            <h4>Restaurant am See (Grüner Baum)</h4>
+            <p>Lakeside terasa, podle blogerů nejlepší jídlo v Hallstattu - ryby, místní víno, dezerty. Dražší, nutná rezervace. Hlavní jídla cca 25-32 €.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="https://maps.google.com/?cid=6156826854753973498&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="food-card">
+          <img src="https://lh3.googleusercontent.com/place-photos/AJRVUZO8kBt0ZavGfolMnX_Q5sMx_2ZAaYUlEu0RCnL6d2XPsUZJpV6QZYjCvsJblN5mCup4CluPhGKPy9Jivjl4nT5csFzzSwnrzcqi7W9-L1Mtexh2MP-iVFiUm3v37grQbxxOTDE4Wjv5MfHl3rw=s4800-w800-h600" alt="Seewirt Zauner" loading="lazy">
+          <div class="body">
+            <span class="tip-badge">Klasika</span>
+            <h4>Seewirt Zauner</h4>
+            <p>Populární, trochu nevyrovnané recenze na servis, ale Zauner Cordon Bleu má pověst must-try. Rezervujte předem. Hlavní jídla cca 20-26 €.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="https://maps.google.com/?cid=7597600589315876764&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="food-card">
+          <img src="https://lh3.googleusercontent.com/place-photos/AJRVUZP1sE9B6lQBzjHu38MIarRQYGWt1Qcdx5N0HDcjSsbsgL0Uz7SY63mQ1-f1IvfEn9sARy8yRfdoY7oAErl3QMCxws6s_OH4XY1VGCJLw1QuAYdJ9491oLaTipgMzxQ0XMADXZ4cmEsVGQeczA=s4800-w800-h600" alt="Muk's Schmankerl" loading="lazy">
+          <div class="body">
+            <span class="tip-badge">Rychlá svačina</span>
+            <h4>Muk's Schmankerl</h4>
+            <p>Malé okénko u jezera, kus pizzy z papírového talíře a zmrzlina k tomu. Levnější než většina podniků v centru. Pizza cca 8-10 €, zmrzlina pár euro.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="https://maps.google.com/?cid=17295876897694132437&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="food-card">
+          <img src="https://lh3.googleusercontent.com/place-photos/AJRVUZOQ4dW-xCF4OgVDsoOZAiqrUshvkQu_0lHrBo4q-2Z4o_koUyc1hkgry8DCE5w4r7ewHnn5EkkKS91p0jh4MwylNgPGs78Myo6DfUmRdxyhUZW_hKzEeHGW22OMXJahMkJLRrs3ZSJETxFJ=s4800-w800-h600" alt="Uferwirt Seeraunzn" loading="lazy">
+          <div class="body">
+            <span class="tip-badge">Pro dobrodružnější</span>
+            <h4>Uferwirt Seeraunzn</h4>
+            <p>Na druhé straně jezera u Bad Goisern, nejlépe hodnocený podnik v okolí (4,8★), autentický, bez turistických cen. Vyžaduje trajekt nebo objížďku autem. Hlavní jídla cca 16-22 €.</p>
+            <div class="actions">
+              <a class="btn btn-primary" href="https://maps.google.com/?cid=9938063613347870659&amp;g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA" target="_blank" rel="noopener">📍 Navigovat</a>
+              <a class="btn btn-outline" href="https://www.seeraunzn.at/" target="_blank" rel="noopener">🌐 Web</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <p class="source-note">Fotky jsou přímo z Google Maps (recenze návštěvníků a podniků). Tipy poskládané z recenzí food blogů (Girl on a Zebra, Food Nerd Rockstar, Backpacks &amp; Bubbly) a vysoce hodnocených Google recenzí, ne z vlastní zkušenosti, berte jako dobrý výchozí bod, ne jistotu. Ceny jídla jsou orientační odhady z recenzí a menu jednotlivých dnů se mohou lišit, ceny vleků/lodi/parkování jsou aktuální sazby z léta 2026.</p>
+
+    </section>
+
+  </div>
+
+</div>
+
+<footer>
+  Hallstatt · sobota-neděle · vytvořeno jako rychlý itinerář na telefon.<br>
+  Před odjezdem ještě jednou zkontrolujte stav <a href="https://www.salzwelten.at/de/hallstatt" target="_blank" rel="noopener">solného dolu</a>.
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  var satPoints = [
+    {lat:47.5550696, lng:13.6451970, name:"Parkovani P2", time:"10:45", url:"https://maps.google.com/?cid=4052720346332039370"},
+    {lat:47.5601991, lng:13.6474058, name:"Ubytovani", time:"11:00", url:"https://maps.google.com/?cid=1504682215292579469"},
+    {lat:47.5624068, lng:13.6492914, name:"Marktplatz", time:"11:15", url:"https://maps.google.com/?cid=16530980495413342635"},
+    {lat:47.5636280, lng:13.6487240, name:"Kostnice", time:"11:45", url:"https://maps.google.com/?cid=15497066320737463556"},
+    {lat:47.5618954, lng:13.6489624, name:"Welterbemuseum", time:"14:00", url:"https://maps.google.com/?cid=6174158825528039554"},
+    {lat:47.5630787, lng:13.6497494, name:"Plavba lodi", time:"16:00", url:"https://maps.google.com/?cid=12671259917680950511"},
+    {lat:47.5493080, lng:13.6156983, name:"Echernske udoli (volitelne)", time:"17:45", url:"https://maps.google.com/?cid=9591628001572423361"},
+    {lat:47.5570660, lng:13.6475837, name:"Fotopoint vecer", time:"20:30", url:"https://maps.google.com/?cid=3154636299310588243"}
+  ];
+
+  var sunPoints = [
+    {lat:47.5645953, lng:13.6499746, name:"Ikonicka vyhlidka", time:"07:30", url:"https://maps.google.com/?cid=15999042382827244637"},
+    {lat:47.5550696, lng:13.6451970, name:"Vyzvednuti auta (P2)", time:"09:00", url:"https://maps.google.com/?cid=4052720346332039370"},
+    {lat:47.5286120, lng:13.6920417, name:"Five Fingers (varianta A)", time:"09:15", url:"https://maps.google.com/?cid=16026479998856745283"},
+    {lat:47.5286719, lng:13.5064417, name:"Gosausee (varianta B)", time:"09:15", url:"https://maps.google.com/?cid=10876582086726110688"},
+    {lat:47.5601991, lng:13.6474058, name:"Navrat k ubytovani", time:"13:30", url:"https://maps.google.com/?cid=1504682215292579469"}
+  ];
+
+  var foodPoints = [
+    {lat:47.5620505, lng:13.6493855, name:"Zum Bader Gastwirtschaft", time:"So 12:15 - obed", url:"https://maps.google.com/?cid=8451986518570336850"},
+    {lat:47.5609448, lng:13.6482808, name:"Ruhrwerk", time:"So 17:15 - svacina", url:"https://maps.google.com/?cid=6921226713928956647"},
+    {lat:47.5605760, lng:13.6479299, name:"Braugasthof am Hallstattersee", time:"So 19:00 - vecere", url:"https://maps.google.com/?cid=10838280871846427130"},
+    {lat:47.5592561, lng:13.6781564, name:"Seecafe Obertraun", time:"Ne 12:00 - obed, varianta A", url:"https://maps.google.com/?cid=5355535917644338578"},
+    {lat:47.5332328, lng:13.4968833, name:"Gasthof Gosausee", time:"Ne 11:30 - obed, varianta B", url:"https://maps.google.com/?cid=10557133409220235505"},
+    {lat:47.5624662, lng:13.6499061, name:"Restaurant am See", time:"tip navic", url:"https://maps.google.com/?cid=6156826854753973498"},
+    {lat:47.5622444, lng:13.6487667, name:"Seewirt Zauner", time:"tip navic", url:"https://maps.google.com/?cid=7597600589315876764"},
+    {lat:47.5595131, lng:13.6473988, name:"Muk's Schmankerl", time:"tip navic", url:"https://maps.google.com/?cid=17295876897694132437"},
+    {lat:47.5899890, lng:13.6668429, name:"Uferwirt Seeraunzn", time:"tip navic", url:"https://maps.google.com/?cid=9938063613347870659"}
+  ];
+
+  var maps = {};
+
+  function buildMap(containerId, points, color){
+    var map = L.map(containerId, {scrollWheelZoom:false}).setView([47.560, 13.648], 14);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    var markers = [];
+    points.forEach(function(p){
+      var marker = L.circleMarker([p.lat, p.lng], {
+        radius: 9,
+        weight: 2,
+        color: '#16302E',
+        fillColor: color,
+        fillOpacity: 1
+      }).addTo(map);
+      var html = '<b>' + p.time + '</b><br>' + p.name +
+        '<br><a href="' + p.url + '" target="_blank" rel="noopener">Navigovat</a>';
+      marker.bindPopup(html);
+      markers.push(marker);
+    });
+
+    if (markers.length){
+      var group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds(), {padding:[28,28]});
+    }
+    maps[containerId] = map;
+  }
+
+  // mapa pro prvni (vychozi) zalozku se inicializuje hned
+  buildMap('map-sat', satPoints, '#E8A33D');
+
+  var sunReady = false, foodReady = false;
+
+  document.getElementById('tab-sun').addEventListener('change', function(){
+    if (!sunReady){ buildMap('map-sun', sunPoints, '#E8A33D'); sunReady = true; }
+    else { maps['map-sun'].invalidateSize(); }
+  });
+
+  document.getElementById('tab-food').addEventListener('change', function(){
+    if (!foodReady){ buildMap('map-food', foodPoints, '#2E6F72'); foodReady = true; }
+    else { maps['map-food'].invalidateSize(); }
+  });
+
+  document.getElementById('tab-sat').addEventListener('change', function(){
+    if (maps['map-sat']) maps['map-sat'].invalidateSize();
+  });
+})();
+</script>
+
+</body>
+</html>
